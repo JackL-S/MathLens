@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools==82.0.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mathlens"
+version = "0.1.0.dev0"
+description = "Local math tool for LaTeX and image input with symbolic results first."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = "MIT"
+license-files = ["LICENSE"]
+dependencies = [
+    "sympy==1.14.0",
+    "latex2sympy2==1.9.1",
+    "antlr4-python3-runtime==4.7.2",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==8.4.2"]
+
+# Add the CLI entry point when mathlens.cli.main is implemented.
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mathlens", "mathlens.*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+addopts = ["--import-mode=importlib"]
