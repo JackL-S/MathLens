@@ -5,7 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/.python/cpython-3.12.12-windows-x86_64-none" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/.python/cpython-3.12.12-windows-x86_64-none/DLLs" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/.python/cpython-3.12.12-windows-x86_64-none/Lib" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/src" />
+      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
     </content>
     <orderEntry type="jdk" jdkName="D:\projects\py\MathLens\.venv" jdkType="Python SDK" />
