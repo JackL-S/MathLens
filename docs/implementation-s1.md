@@ -30,7 +30,8 @@
 | 应用编排 | `application.py`、`execution.py` | 准备问题、调用计算、超时与资源回收 |
 | 计算 | `solving/` | 符号计算、结果分类、约束检查、数学内容序列化 |
 | 展示 | `rendering/`、`cli.py` | 输出格式与命令行交互 |
-| 共享模型 | `models.py` | 请求、问题描述、结果与诊断，不依赖 SymPy |
+| 枚举 | `enums.py` | 请求、问题描述、结果|
+ | 契约 | `schemas.py` | 计算请求、执行描述与公开结果的数据结构 |
 
 文件布局：
 
@@ -95,7 +96,7 @@ py -3.12 -m venv .venv
 |---|---|
 | `ComputeRequest` | `input_kind="latex"`, `latex`, `operation`, `variables`, `domain`, `assumptions`, `bounds`, `budget`；不定义图片或数值求解参数 |
 | `PreparedProblem` | 已校验的 LaTeX、运算、变量、定义域、上下限与预算；不含 SymPy 对象 |
-| `ComputationResult` | `schema_version`, `status`, `result_kind`, `completeness`, `verification`, `value`, `latex`, `conditions`, `diagnostics`, `attempts`，并报告实际定义域 |
+| `ComputationResult` | `schema_version`, `status`, `result_kind`, `completeness`, `value`, `latex`, `conditions`, `diagnostics`, `attempts`；响应不包含 domain 字段 |
 
 `operation` 为 `simplify / differentiate / integrate / solve_equation`。`domain` 枚举为 `real / complex / integer / positive_real`，S1 默认且仅支持 real；其他已知域返回 `unsupported + domain_not_enabled`，未知值返回 `error + invalid_domain`。`assumptions` 仅接受缺省或空映射，非空返回 `unsupported + assumptions_not_enabled`，不构造自定义变量假设。
 
@@ -133,7 +134,7 @@ S1 的 result_kind 取值为 `exact / mixed / unevaluated / none`，mixed 仅指
 
 `value` 为带 kind 的 JSON 对象：表达式含 `latex/text`，有限集含元素表示数组，符号集保留整体表示和条件。`divergent` 另含 `direction=positive_infinity/negative_infinity/does_not_exist`；exact 在此表示收敛性判定确定，不表示存在有限值。无数学结果时顶层 `latex=null`。`conditions` 是 `latex/text` 对象数组，积分常数由 solving 层加入。数学数值使用字符串或带标签表示，避免精度丢失及非标准 NaN/Infinity；异常对象不得进入结果，所有嵌套字段须通过严格 JSON 往返。
 
-**S1 所有结果的 `verification` 固定为 `not_performed`**，包含成功和父进程生成的错误/超时。必要的参数、定义域、收敛性和序列化检查仍执行；此字段仅报告独立数学复核，S1 不实现独立复核流程。
+参数、定义域、收敛性和序列化检查在对应阶段执行，不增加独立复核流程或输出复核状态。
 
 ### 版本
 
@@ -180,7 +181,7 @@ CLI 默认两行 `status: ...`、`latex: ...`（无答案为 `(none)`），有�
 | 兼容性与单元测试 | 固定版本后验证解析样例、下标变量、log 底数、积分上下限、导数不重复计算、恒等式原始约束；分别测试语法错误与运算不支持 |
 | 数学回归 | `1/3+1/6`、导数、不定/定积分、`x^2-2=0`、实数域 `x^2+1=0` 空集、`x=x` 全集；含分母约束的输入不可丢排除点 |
 | 发散与未完成 | `1/x` 在 `[0,1]` 向正无穷发散、在 `[-1,1]` 普通积分不存在；未定结果不直接标为发散 |
-| 结果与协议 | fixtures 保存 request、status、诊断代码、latex 及必要数学期望；检查映射表、JSON 往返、无 SymPy 泄漏、版本异常、固定 verification |
+| 结果与协议 | fixtures 保存 request、status、诊断代码、latex 及必要数学期望；检查映射表、JSON 往返、无 SymPy 泄漏、版本异常 |
 | 执行与 CLI | 注入可控卡住 worker，验证预算加清理余量内返回、进程回收且下一请求可用；覆盖崩溃、EOF、坏 JSON、超大消息、needs_input 两个来源、两种输出模式 |
 
 比较数学语义并保留稳定 LaTeX 快照，基线变化先核对原因。上述检查通过并有安装/运行说明，S1 才算完成。
