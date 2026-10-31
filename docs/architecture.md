@@ -103,4 +103,4 @@ flowchart TD
 全项目的数据模型、模块接口、JSON 协议及状态规则见[接口契约](interfaces.md)。
 各模型的存放位置和依赖关系见[模型组织说明](schemas.md)。
 当前仅定义接口，尚未实现计算链路；模型覆盖的能力不等于已启用能力。
-历史依赖探测记录见[早期实现记录](implementation-s1.md)，项目目标和进度见 [README](../README.md)。
+当前开发顺序和验收用例见[S1 实施计划](implement-s1.md)，项目目标和进度见 [README](../README.md)。
