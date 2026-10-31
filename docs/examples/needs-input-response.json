@@ -1,0 +1,48 @@
+{
+  "status": "needs_input",
+  "problem": null,
+  "preview": {
+    "latex": "x y",
+    "text": "x*y"
+  },
+  "input_requests": [
+    {
+      "code": "missing_variable",
+      "message": "请选择求导变量",
+      "field_path": "/operation/targets",
+      "choices": [
+        {
+          "choice_id": "x",
+          "label": "x",
+          "latex": null,
+          "operation": {
+            "targets": [
+              {
+                "variable": "x",
+                "order": 1
+              }
+            ],
+            "kind": "differentiate"
+          }
+        },
+        {
+          "choice_id": "y",
+          "label": "y",
+          "latex": null,
+          "operation": {
+            "targets": [
+              {
+                "variable": "y",
+                "order": 1
+              }
+            ],
+            "kind": "differentiate"
+          }
+        }
+      ]
+    }
+  ],
+  "diagnostics": [],
+  "schema_version": 1,
+  "kind": "preparation"
+}

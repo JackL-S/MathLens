@@ -1,0 +1,24 @@
+{
+  "input": {
+    "latex": "x^3",
+    "source": null,
+    "kind": "latex"
+  },
+  "operation": {
+    "targets": [
+      {
+        "variable": "x",
+        "order": 2
+      }
+    ],
+    "kind": "differentiate"
+  },
+  "symbols": [],
+  "preferences": {
+    "method": "symbolic_first",
+    "include_approximation": false,
+    "significant_digits": 30,
+    "include_steps": false
+  },
+  "schema_version": 1
+}

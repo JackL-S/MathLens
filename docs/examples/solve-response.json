@@ -1,0 +1,64 @@
+{
+  "status": "success",
+  "problem": {
+    "original_input": {
+      "latex": "x^2-2=0",
+      "source": null,
+      "kind": "latex"
+    },
+    "latex": "x^2-2=0",
+    "operation": {
+      "unknowns": [
+        "x"
+      ],
+      "solution_domain": "real",
+      "numeric": null,
+      "kind": "solve_equation"
+    },
+    "symbols": [],
+    "preferences": {
+      "method": "symbolic_first",
+      "include_approximation": false,
+      "significant_digits": 30,
+      "include_steps": false
+    },
+    "changes": [],
+    "schema_version": 1
+  },
+  "result_kind": "exact",
+  "completeness": "complete",
+  "value": {
+    "elements": [
+      {
+        "expression": {
+          "latex": "-\\sqrt{2}",
+          "text": "-sqrt(2)"
+        },
+        "result_kind": "exact",
+        "kind": "expression"
+      },
+      {
+        "expression": {
+          "latex": "\\sqrt{2}",
+          "text": "sqrt(2)"
+        },
+        "result_kind": "exact",
+        "kind": "expression"
+      }
+    ],
+    "kind": "finite_set"
+  },
+  "latex": "x \\in \\{-\\sqrt{2}, \\sqrt{2}\\}",
+  "conditions": [],
+  "approximations": [],
+  "steps": {
+    "status": "not_requested",
+    "items": [],
+    "diagnostics": []
+  },
+  "input_requests": [],
+  "diagnostics": [],
+  "attempts": [],
+  "schema_version": 1,
+  "kind": "computation"
+}
