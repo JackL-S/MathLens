@@ -1,10 +1,11 @@
 # 模型组织说明
 
 `src/mathlens/schemas/` 保存整个项目的公开数据模型。模型按数据类型和用途
-分组，服务函数仍位于 application、execution、jobs、ocr 等业务模块。
+分组，服务函数位于 application、execution 等业务模块。未实现的 CLI、后台任务、
+媒体、OCR 和展示服务不保留占位函数或专属响应模型。
 当前已提供输入、Spec、请求、符号、偏好和执行选项的显式组合校验，构造模型
-不会自动校验。解析、计算与 codec
-尚未实现；跨原式的语义约束仍由后续准备和计算过程落实。
+不会自动校验。显式算术化简、JSON 编解码和独立 worker 已接通；其他数学
+能力仍按准备和计算流程逐项开放。
 
 阅读项目职责见[项目架构](architecture.md)，字段规则与状态语义见
 [接口契约](interfaces.md)。本文说明模型在哪里、怎样组合，以及如何扩展。
@@ -45,7 +46,6 @@ from .operations import OperationSpec
 |---|---|
 | SCHEMA_VERSION | 公开数据契约版本 |
 | PROTOCOL_VERSION | worker 通信协议版本 |
-| JSONValue | JSON 可表达的递归值类型，不等于业务模型或运行时校验器 |
 | MathExpression | 数学内容的 latex/text 展示表示 |
 
 MathExpression 不保存 SymPy 对象，不承诺 text 可执行或 latex 可无损恢复 AST。
@@ -55,12 +55,12 @@ MathExpression 不保存 SymPy 对象，不承诺 text 可执行或 latex 可无
 | 定义 | 用途 |
 |---|---|
 | ImageRegion | 原图坐标中的矩形区域 |
-| MediaResource | 图片资源标识、格式和尺寸 |
 | ImageInput | 图片标识及可选识别区域 |
 | LatexInput | 公式原文及可选图片来源 |
 | InputSpec | LatexInput 或 ImageInput |
 
-图片字节由 media 服务注册，模型只传 media_id。资源管理函数不放在 schemas。
+图片模型只传 media_id；当前图片主输入返回 unsupported，来源记录仍可保留。
+图片字节管理和识别接口在实际实现时定义，不放在 schemas 中提前占位。
 
 ### operations.py：运算规格及参数
 
@@ -138,17 +138,6 @@ Diagnostic 说明发生了什么；InputRequest 说明用户接下来能做什�
 ready 必须带 PreparedProblem；needs_input 必须有可操作的 InputRequest。
 此文件只保存响应模型，prepare 函数位于 application.py。
 
-### recognition.py：OCR 识别
-
-| 定义 | 用途 |
-|---|---|
-| RecognitionCandidate | 候选公式、标识与可选置信度 |
-| RecognizedRegion | 识别区域及有序候选 |
-| RecognitionRequest | 独立 OCR 请求 |
-| RecognitionResponse | OCR 状态、区域候选与诊断 |
-
-识别结果不是计算问题。用户确认后用 LatexInput 保留公式和图片来源，再准备。
-
 ### results.py：数学答案和计算响应
 
 | 定义 | 用途 |
@@ -185,17 +174,13 @@ completeness 是不同维度。步骤不可用不自动使已完成答案失败�
 | PrepareTask | 准备任务，携带 ComputeRequest |
 | ComputeTask | 计算任务，携带 PreparedProblem |
 | RunTask | 一站式任务，携带 ComputeRequest |
-| RecognizeTask | OCR 任务，携带 RecognitionRequest |
-| WorkerTask | 四类 worker 任务的联合 |
-| WorkerResponse | 准备、计算或 OCR 响应的联合 |
+| WorkerTask | prepare / compute / run 三类任务的联合 |
 | WorkerRequest | 协议版本、任务载荷与执行选项 |
 | WorkerResult | 协议版本与任务响应 |
-| JobHandle | 后台任务标识 |
-| JobSnapshot | 后台任务状态、进度、响应和诊断 |
-| CancelResponse | 取消请求是否接受及当前状态 |
 
-schemas/tasks.py 保存数据及执行选项的纯参数校验；包外的 execution.py 管单次执行，jobs.py 管后台
-生命周期。ExecutionControl 和 CancellationToken 是运行时对象，留在
+WorkerResult.response 直接使用 ApplicationResponse。
+schemas/tasks.py 保存数据及执行选项的纯参数校验；包外的 execution.py 管单次执行。
+ExecutionControl 和 CancellationToken 是运行时对象，留在
 control.py，不进入 schemas 或 JSON。
 
 ## 3. 依赖方向
@@ -206,14 +191,13 @@ control.py，不进入 schemas 或 JSON。
 |---|---|
 | base | 无 |
 | validation | 无 |
-| inputs | base、validation |
+| inputs | validation |
 | operations | validation |
 | requests | base、inputs、operations、validation |
 | diagnostics | operations |
 | preparation | base、diagnostics、requests |
-| recognition | base、diagnostics、inputs |
 | results | base、diagnostics、preparation、requests |
-| tasks | base、diagnostics、recognition、requests、results、validation |
+| tasks | base、requests、results、validation |
 
 统一入口 __init__.py 最后汇总这些类型，子模块不能反向依赖它。模型模块也
 不能导入任何业务服务，否则容易造成 application → schemas → application
@@ -242,8 +226,9 @@ request = ComputeRequest(
 
 未来准备成功后生成 PreparedProblem，compute 消费该快照，返回 ComputeResponse。
 参数不足时返回 PreparationResponse 和 InputRequest，调用方修改请求再提交。
-prepare 已处理基础输入问题和 Spec 校验问题；参数通过但解析尚未接入时返回
-能力不可用响应，不返回 ready。compute、run 和 codec 仍保留 NotImplementedError。
+prepare 在参数通过后提交 worker，完成清理、解析和原式条件提取，返回 ready
+快照。compute 重新检查快照再化简；run 在同一 worker 内复用解析。当前只支持
+显式算术化简，长期模型中其他运算的存在不代表已可计算。
 
 对应 JSON 示例见 [求导请求](examples/differentiate-request.json)、
 [完整有限解集](examples/solve-response.json) 和
@@ -257,8 +242,8 @@ OperationSpec，并实现 validate()；再更新统一导出、接口规则与�
 
 新增结果形状时，在 results.py 定义模型并加入 MathValue，明确它对性质和
 完整性的影响；不要用通用字典绕过已有结构。所有模型继续使用 frozen、
-kw_only dataclass 和 tuple 集合；边界校验由将来的 codec 实现。
+kw_only dataclass 和 tuple 集合；边界结构由 codec 恢复检查，参数语义由模型校验。
 
 移动模型之后运行完整契约测试，核对统一导入、嵌套类型解析、标签唯一性和
-JSON 示例。文档中的目录、类型索引和本地链接也要同步。当前测试仅验证结构
-与示例，不替代未来的数学、JSON 校验和任务执行测试。
+JSON 示例。文档中的目录、类型索引和本地链接也要同步。契约测试验证结构与示例；
+数学语义、JSON 边界和隔离执行分别由解析、计算、codec 和 execution 测试覆盖。
