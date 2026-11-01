@@ -104,6 +104,8 @@ PreparationResponse 描述准备阶段如何结束，单独位于 preparation.py
 
 Diagnostic 说明发生了什么；InputRequest 说明用户接下来能做什么。
 两者可被准备与计算响应复用，不依赖具体响应类。
+两者的 code 内部统一引用 enums.DiagnosticCode，完整分类见
+[诊断代码](diagnostics.md)。字段保留 str 以兼容未来的未知诊断代码。
 
 ### preparation.py：准备响应
 

@@ -55,6 +55,7 @@ JSON 边界的数据模型与函数签名，尚未实现计算与识别逻辑，
 - [项目架构](docs/architecture.md)：各部分负责什么，怎样协作。
 - [全项目接口契约](docs/interfaces.md)：请求、结果、确认流程、JSON 和执行控制。
 - [模型组织说明](docs/schemas.md)：schemas 分类、类型索引、依赖与阅读顺序。
+- [诊断代码](docs/diagnostics.md)：请求、图片、识别、数学与执行问题的统一原因码。
 - [S1 实施计划](docs/implement-s1.md)：准备、解析与符号计算的开发顺序和验收用例。
 - [开发规范](docs/development.md)：代码、测试和团队协作的基本约定。
 

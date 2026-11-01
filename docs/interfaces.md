@@ -188,7 +188,8 @@ unavailable 和步骤诊断，不把已完成的答案改为失败。
 
 `Diagnostic` 使用 code / message / severity / stage / field_paths。
 code 为稳定、可扩展的机器标识；调用方不解析中文 message，不把未知代码
-视为协议损坏。severity 不替代整体状态。常用代码及归类：
+视为协议损坏。内部统一使用 enums.DiagnosticCode，枚举覆盖整个项目，
+完整代码表与兼容规则见[诊断代码](diagnostics.md)。severity 不替代整体状态。
 
 field_paths 相对产生诊断的入口输入文档：prepare/run 对应 ComputeRequest，
 compute 对应 PreparedProblem，recognize 对应 RecognitionRequest，IPC 解码
@@ -202,12 +203,17 @@ compute 对应 PreparedProblem，recognize 对应 RecognitionRequest，IPC 解�
 | missing_variable / missing_bound | needs_input，参数不充分 |
 | ambiguous_operation / ocr_confirmation_required | needs_input，需确认 |
 | conflicting_arguments | needs_input，显式信息冲突 |
-| operation_not_supported / domain_not_enabled | unsupported，已知能力未启用 |
+| capability_unavailable | 当前后端或配置缺少所需能力，状态由整体流程决定 |
+| invalid_image / recognition_failed | error，分别表示图片无效和识别失败 |
+| ocr_confirmation_required | needs_input，需确认识别候选 |
 | symbolic_not_completed | unsupported，有未完成数学内容 |
 | invalid_latex | error，输入无法构成合法公式 |
 | deadline_exceeded / cancelled | timeout / cancelled |
 | worker_failed / cleanup_failed | error，执行或资源回收失败 |
 | schema_version_mismatch / protocol_version_mismatch | error，版本不兼容 |
+
+同一 code 不固定绑定 status；上表列常见用法。具体输入类型、定义域等通过
+字段位置和消息说明，不新增按当前开发进度命名的原因码。
 
 数学输入问题和可预期执行失败通过响应表达。codec 无法构成请求时抛出带
 code、field_path 的 ContractDecodeError，由 CLI/Web 边界转换成公开错误。

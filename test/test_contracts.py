@@ -11,9 +11,12 @@ from typing import get_args, get_type_hints
 import pytest
 
 from mathlens import schemas
-from mathlens.enums import Completeness, PreparationStatus, ResultKind, Status
+from mathlens.enums import (
+    Completeness, DiagnosticCode, MessageType, PreparationStatus,
+    ProcessingStage, ResultKind, Status,
+)
 from mathlens.schemas import (
-    ComputeRequest, ComputeResponse, DifferentiationTarget, DifferentiateSpec,
+    ComputeRequest, ComputeResponse, Diagnostic, DifferentiationTarget, DifferentiateSpec,
     ExpressionValue, FiniteSetValue, InputChoice, InputRequest, IntegrateSpec,
     IntegrationLimit, LatexInput, MathExpression, PreparationResponse,
     PreparedProblem, ResultPreferences, SolveSpec,
@@ -75,7 +78,7 @@ def test_documented_variable_confirmation():
         status=PreparationStatus.NEEDS_INPUT,
         preview=MathExpression(latex="x y", text="x*y"),
         input_requests=(InputRequest(
-            code="missing_variable",
+            code=DiagnosticCode.MISSING_VARIABLE,
             message="请选择求导变量",
             field_path="/operation/targets",
             choices=tuple(
@@ -138,6 +141,26 @@ def test_all_nested_contract_annotations_resolve():
     for model in vars(schemas).values():
         if inspect.isclass(model) and is_dataclass(model):
             get_type_hints(model)
+
+
+def test_diagnostic_code_has_a_stable_json_string():
+    diagnostic = Diagnostic(
+        code=DiagnosticCode.INVALID_IMAGE,
+        message="图片无法解码",
+        severity=MessageType.ERROR,
+        stage=ProcessingStage.INPUT,
+    )
+    assert representation(diagnostic)["code"] == "invalid_image"
+
+
+def test_unknown_diagnostic_code_can_be_preserved():
+    diagnostic = Diagnostic(
+        code="future_diagnostic_code",
+        message="未来版本的诊断",
+        severity=MessageType.WARNING,
+        stage=ProcessingStage.COMPUTE,
+    )
+    assert representation(diagnostic)["code"] == "future_diagnostic_code"
 
 
 def test_schema_models_have_a_canonical_public_export():

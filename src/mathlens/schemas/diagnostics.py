@@ -8,7 +8,10 @@ from .operations import OperationSpec
 
 @dataclass(frozen=True, kw_only=True)
 class Diagnostic:
-    """code 为稳定标识；field_paths 相对当前入口的输入文档定位字段。"""
+    """内部 code 使用 DiagnosticCode，外部未知代码保留为字符串。
+
+    field_paths 相对当前入口的输入文档定位字段。
+    """
 
     code: str
     message: str
@@ -27,7 +30,10 @@ class InputChoice:
 
 @dataclass(frozen=True, kw_only=True)
 class InputRequest:
-    """修改字段后重新 prepare；choice_id 不是可执行令牌。"""
+    """code 复用 DiagnosticCode；修改字段后重新 prepare。
+
+    外部未知代码保留为字符串；choice_id 不是可执行令牌。
+    """
 
     code: str
     message: str
