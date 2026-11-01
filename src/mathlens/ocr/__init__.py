@@ -1,6 +1,6 @@
 """独立 OCR 入口，也可由应用准备流程调用。"""
 
-from ..execution import ExecutionControl
+from ..control import ExecutionControl
 from ..schemas import ExecutionOptions, RecognitionRequest, RecognitionResponse
 
 

@@ -1,11 +1,80 @@
-"""各入口共用的应用接口；这里只声明契约。"""
-from .enums import DiagnosticCode, PreparationStatus, MessageType, ProcessingStage
-from .execution import ExecutionControl
-from .schemas import (
-    ApplicationResponse, Capabilities, ComputeRequest, ComputeResponse,
-    ExecutionOptions, PreparationResponse, PreparedProblem, Diagnostic, SCHEMA_VERSION, ImageInput, InputRequest,
-    LatexInput, OperationSpec,
+"""应用入口：组织输入检查、Spec 校验和后续准备流程。"""
+
+from .enums import (
+    DiagnosticCode, MessageType, PreparationStatus, ProcessingStage,
+    ValidationIssueKind,
 )
+from .control import ExecutionControl
+from .schemas import (
+    ApplicationResponse, Capabilities, ComputeRequest,
+    ComputeResponse, Diagnostic, ExecutionOptions, ImageInput, InputRequest,
+    DifferentiateSpec, LatexInput, PreparationResponse, PreparedProblem,
+    ResourceLimits, SolveSpec, ValidationIssue,
+)
+from .schemas.validation import invalid, matches_type, model_issues
+
+
+def _validation_response(
+    issues: tuple[ValidationIssue, ...],
+    *, stage: ProcessingStage = ProcessingStage.PREPARE,
+) -> PreparationResponse:
+    """转换校验问题；无效参数优先报错，同时保留可操作的补充项。"""
+    diagnostics = tuple(
+        Diagnostic(
+            code=issue.code, message=issue.message,
+            severity=MessageType.ERROR, stage=stage,
+            field_paths=(issue.field_path,),
+        )
+        for issue in issues if issue.kind is ValidationIssueKind.INVALID
+    )
+    input_requests = tuple(
+        InputRequest(
+            code=issue.code, message=issue.message, field_path=issue.field_path,
+        )
+        for issue in issues if issue.kind in (
+            ValidationIssueKind.MISSING, ValidationIssueKind.CONFLICT,
+        )
+    )
+    return PreparationResponse(
+        status=PreparationStatus.ERROR if diagnostics else PreparationStatus.NEEDS_INPUT,
+        diagnostics=diagnostics, input_requests=input_requests,
+    )
+
+
+def _request_limit_issues(
+    request: ComputeRequest, limits: ResourceLimits,
+) -> tuple[ValidationIssue, ...]:
+    """只消费已通过结构校验的请求和限制；不解析公式、不执行计算。"""
+    issues = ()
+    if isinstance(request.input, LatexInput):
+        try:
+            size = len(request.input.latex.encode("utf-8"))
+        except UnicodeEncodeError:
+            issues += invalid("/input/latex", "公式含有非法 Unicode 字符", DiagnosticCode.INVALID_LATEX)
+        else:
+            if size > limits.max_input_bytes:
+                issues += invalid(
+                    "/input/latex", "公式超过输入字节限制", DiagnosticCode.RESOURCE_LIMIT_EXCEEDED,
+                )
+    if request.preferences.significant_digits > limits.max_significant_digits:
+        issues += invalid(
+            "/preferences/significant_digits", "展示精度超过限制", DiagnosticCode.RESOURCE_LIMIT_EXCEEDED,
+        )
+    operation = request.operation
+    if isinstance(operation, DifferentiateSpec):
+        for index, target in enumerate(operation.targets):
+            if target.order > limits.max_derivative_order:
+                issues += invalid(
+                    f"/operation/targets/{index}/order", "求导阶数超过限制",
+                    DiagnosticCode.RESOURCE_LIMIT_EXCEEDED,
+                )
+    if isinstance(operation, SolveSpec) and operation.numeric is not None:
+        if operation.numeric.significant_digits > limits.max_significant_digits:
+            issues += invalid(
+                "/operation/numeric/significant_digits", "求解精度超过限制",
+                DiagnosticCode.RESOURCE_LIMIT_EXCEEDED,
+            )
+    return issues
 
 
 def prepare(
@@ -14,123 +83,47 @@ def prepare(
     options: ExecutionOptions | None = None,
     control: ExecutionControl | None = None,
 ) -> PreparationResponse:
-    """识别、预览并确认问题；歧义返回 input_requests，不擅自计算。
+    """检查请求并委托 Spec 校验自身参数，统一返回输入问题。
 
-    成功返回 ready 和 PreparedProblem。耗时解析及 OCR 同样受执行控制。
-    输入错误通过响应表达。
+    构造 Spec 不执行校验，不因输入问题抛异常。参数检查通过后还需解析、
+    预览和语义检查；尚未接入时明确返回能力不可用，不提前报告 ready。
     """
-    # 判断request是否是ComputeRequest
-    if not isinstance(request, ComputeRequest):
-        return PreparationResponse(
-            status=PreparationStatus.ERROR,
-            diagnostics=(
-                Diagnostic(
-                    code=DiagnosticCode.INVALID_REQUEST,
-                    message="请求必须是 ComputeRequest",
-                    severity=MessageType.ERROR,
-                    stage=ProcessingStage.PREPARE,
-                    field_paths=("",),
-                ),
-            ),
-        )
-    # 判断schema_version
-    if type(request.schema_version) is not int or request.schema_version != SCHEMA_VERSION:
-        return PreparationResponse(
-            status=PreparationStatus.ERROR,
-            diagnostics=(
-                Diagnostic(
-                    code=DiagnosticCode.SCHEMA_VERSION_MISMATCH,
-                    message="版本类型或值不正确",
-                    severity=MessageType.ERROR,
-                    stage=ProcessingStage.PREPARE,
-                    field_paths=("/schema_version",),
-                ),
-            )
-        )
-    # input合法性检查
-    if not isinstance(request.input, (ImageInput, LatexInput)):
-        return PreparationResponse(
-            status=PreparationStatus.ERROR,
-            diagnostics=(
-                Diagnostic(
-                    code=DiagnosticCode.INVALID_REQUEST,
-                    message="输入必须是 LatexInput 或 ImageInput",
-                    severity=MessageType.ERROR,
-                    stage=ProcessingStage.PREPARE,
-                    field_paths=("/input",),
-                ),
-            )
-        )
+    if not matches_type(request, ComputeRequest):
+        return _validation_response((ValidationIssue(
+            kind=ValidationIssueKind.INVALID, code=DiagnosticCode.INVALID_REQUEST,
+            message="请求必须是 ComputeRequest", field_path="",
+        ),))
+    issues = request.validate()
+    if issues:
+        return _validation_response(issues)
 
-    # TODO:未来实现ImageInput
+    effective_options = ExecutionOptions() if options is None else options
+    option_issues = model_issues(
+        effective_options, ExecutionOptions, "", lambda value: value.validate(),
+    )
+    if option_issues:
+        return _validation_response(option_issues, stage=ProcessingStage.EXECUTION)
+    limit_issues = _request_limit_issues(request, effective_options.limits)
+    if limit_issues:
+        return _validation_response(limit_issues)
     if isinstance(request.input, ImageInput):
         return PreparationResponse(
             status=PreparationStatus.UNSUPPORTED,
-            diagnostics=(
-                Diagnostic(
-                    code=DiagnosticCode.CAPABILITY_UNAVAILABLE,
-                    message="当前尚未支持图片输入",
-                    severity=MessageType.ERROR,
-                    stage=ProcessingStage.PREPARE,
-                    field_paths=("/input",),
-                ),
-            ),
-        )
-    # latex输入检查
-    if not isinstance(request.input.latex, str):
-        return PreparationResponse(
-            status=PreparationStatus.ERROR,
-            diagnostics=(
-                Diagnostic(
-                    code=DiagnosticCode.INVALID_REQUEST,
-                    message="LaTeX 公式必须是字符串",
-                    severity=MessageType.ERROR,
-                    stage=ProcessingStage.PREPARE,
-                    field_paths=("/input/latex",),
-                ),
-            ),
+            diagnostics=(Diagnostic(
+                code=DiagnosticCode.CAPABILITY_UNAVAILABLE,
+                message="当前尚未支持图片输入", severity=MessageType.ERROR,
+                stage=ProcessingStage.PREPARE, field_paths=("/input",),
+            ),),
         )
 
-    if not request.input.latex.strip():
-        return PreparationResponse(
-            status=PreparationStatus.ERROR,
-            diagnostics=(
-                Diagnostic(
-                    code=DiagnosticCode.INVALID_LATEX,
-                    message="公式不能为空",
-                    severity=MessageType.ERROR,
-                    stage=ProcessingStage.PREPARE,
-                    field_paths=("/input/latex",),
-                ),
-            ),
-        )
-    # 运算检查
-    if request.operation is None:
-        return PreparationResponse(
-            status=PreparationStatus.NEEDS_INPUT,
-            input_requests=(
-                InputRequest(
-                    code=DiagnosticCode.MISSING_OPERATION,
-                    message="请选择要执行的运算",
-                    field_path="/operation",
-                ),
-            ),
-        )
-    if not isinstance(request.operation, OperationSpec):
-        return PreparationResponse(
-            status=PreparationStatus.ERROR,
-            diagnostics=(
-                Diagnostic(
-                    code=DiagnosticCode.INVALID_REQUEST,
-                    message="运算必须使用对应的运算规格模型",
-                    severity=MessageType.ERROR,
-                    stage=ProcessingStage.PREPARE,
-                    field_paths=("/operation",),
-                ),
-            ),
-        )
-
-
+    return PreparationResponse(
+        status=PreparationStatus.UNSUPPORTED,
+        diagnostics=(Diagnostic(
+            code=DiagnosticCode.CAPABILITY_UNAVAILABLE,
+            message="参数检查已通过，尚未接入公式解析与问题构建",
+            severity=MessageType.ERROR, stage=ProcessingStage.PREPARE,
+        ),),
+    )
 
 
 def compute(
