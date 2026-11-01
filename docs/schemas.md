@@ -2,7 +2,9 @@
 
 `src/mathlens/schemas/` 保存整个项目的公开数据模型。模型按数据类型和用途
 分组，服务函数仍位于 application、execution、jobs、ocr 等业务模块。
-当前只定义结构和接口，模型中的约束要由未来的 codec、准备和计算过程落实。
+当前已提供输入、Spec、请求、符号、偏好和执行选项的显式组合校验，构造模型
+不会自动校验。解析、计算与 codec
+尚未实现；跨原式的语义约束仍由后续准备和计算过程落实。
 
 阅读项目职责见[项目架构](architecture.md)，字段规则与状态语义见
 [接口契约](interfaces.md)。本文说明模型在哪里、怎样组合，以及如何扩展。
@@ -62,6 +64,10 @@ MathExpression 不保存 SymPy 对象，不承诺 text 可执行或 latex 可无
 
 ### operations.py：运算规格及参数
 
+每种 Spec 和嵌套参数模型提供 validate()，返回相对当前对象的校验问题元组，
+不在构造函数或 __post_init__ 中抛输入异常。无问题返回空元组。运行时容量
+和与公式的语义关系不属于这些纯参数校验。
+
 | 定义 | 用途 |
 |---|---|
 | Substitution | 符号及其 LaTeX 代入值，也可表达数值初值 |
@@ -80,6 +86,20 @@ MathExpression 不保存 SymPy 对象，不承诺 text 可执行或 latex 可无
 这里描述“做什么运算、使用哪些数学参数”。方法策略位于请求的结果偏好中，
 执行超时与容量位于 tasks.py。不得把三类参数混入一个任意 options 字典。
 
+### validation.py：独立校验问题和共用工具
+
+| 定义 | 用途 |
+|---|---|
+| ValidationIssue | 问题性质、原因码、消息和相对字段路径 |
+
+ValidationIssueKind 位于 enums.py，区分 INVALID、MISSING、CONFLICT。
+prefixed() 为嵌套问题附加路径前缀并返回新对象。该模块只依赖枚举，避免
+OperationSpec 与包含运算候选的 InputRequest 形成循环依赖。
+matches_type() 和 has_exact_type() 在接收 object 的运行时边界执行结构检查，
+与模型字段的静态类型声明分开；后者用于拒绝作为整数传入的 bool。
+字符串、集合、嵌套模型、版本、数值与布尔结构检查共用本模块函数，不在
+每个模型或应用入口中复制。模块不做公式解析、I/O 或响应构造。
+
 ### requests.py：请求和问题快照
 
 | 定义 | 用途 |
@@ -93,6 +113,8 @@ MathExpression 不保存 SymPy 对象，不承诺 text 可执行或 latex 可无
 
 ComputeRequest 与 PreparedProblem 都描述输入侧问题，因此集中存放；
 PreparationResponse 描述准备阶段如何结束，单独位于 preparation.py。
+ComputeRequest.validate() 组合输入、运算、偏好和符号校验，保留独立问题；
+重复符号、矛盾假设和仅符号策略与数值求解参数的冲突也在本层报告。
 
 ### diagnostics.py：诊断和交互项
 
@@ -172,9 +194,9 @@ completeness 是不同维度。步骤不可用不自动使已完成答案失败�
 | JobSnapshot | 后台任务状态、进度、响应和诊断 |
 | CancelResponse | 取消请求是否接受及当前状态 |
 
-schemas/tasks.py 仅保存数据；包外的 execution.py 管单次执行，jobs.py 管后台
+schemas/tasks.py 保存数据及执行选项的纯参数校验；包外的 execution.py 管单次执行，jobs.py 管后台
 生命周期。ExecutionControl 和 CancellationToken 是运行时对象，留在
-execution.py，不进入 schemas 或 JSON。
+control.py，不进入 schemas 或 JSON。
 
 ## 3. 依赖方向
 
@@ -183,14 +205,15 @@ execution.py，不进入 schemas 或 JSON。
 | 模块 | 直接依赖 |
 |---|---|
 | base | 无 |
-| inputs | base |
-| operations | 无 |
-| requests | base、inputs、operations |
+| validation | 无 |
+| inputs | base、validation |
+| operations | validation |
+| requests | base、inputs、operations、validation |
 | diagnostics | operations |
 | preparation | base、diagnostics、requests |
 | recognition | base、diagnostics、inputs |
 | results | base、diagnostics、preparation、requests |
-| tasks | base、diagnostics、recognition、requests、results |
+| tasks | base、diagnostics、recognition、requests、results、validation |
 
 统一入口 __init__.py 最后汇总这些类型，子模块不能反向依赖它。模型模块也
 不能导入任何业务服务，否则容易造成 application → schemas → application
@@ -219,7 +242,8 @@ request = ComputeRequest(
 
 未来准备成功后生成 PreparedProblem，compute 消费该快照，返回 ComputeResponse。
 参数不足时返回 PreparationResponse 和 InputRequest，调用方修改请求再提交。
-目前调用 prepare、compute、run 或 codec 仍会抛出 NotImplementedError。
+prepare 已处理基础输入问题和 Spec 校验问题；参数通过但解析尚未接入时返回
+能力不可用响应，不返回 ready。compute、run 和 codec 仍保留 NotImplementedError。
 
 对应 JSON 示例见 [求导请求](examples/differentiate-request.json)、
 [完整有限解集](examples/solve-response.json) 和
@@ -228,7 +252,7 @@ request = ComputeRequest(
 ## 5. 扩展与验证
 
 新增运算时，先在 enums.py 声明名称，在 operations.py 定义专属参数并加入
-OperationSpec；再更新统一导出、接口规则与示例。是否启用仍由能力接口决定，
+OperationSpec，并实现 validate()；再更新统一导出、接口规则与示例。是否启用仍由能力接口决定，
 不能因为枚举存在就自动宣称支持。
 
 新增结果形状时，在 results.py 定义模型并加入 MathValue，明确它对性质和

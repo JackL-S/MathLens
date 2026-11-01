@@ -2,8 +2,10 @@
 
 本文定义全项目的长期接口，不按里程碑限制模型，不代表这些功能已经实现。
 Python 字段与类型以 `src/mathlens/schemas/`、`enums.py` 为准；本文定义
-跨字段约束、流程和 JSON 语义。当前只有模型与函数签名，所有服务入口均显式
-抛出 `NotImplementedError`，没有计算、OCR、校验器、JSON codec 或进程后端。
+跨字段约束、流程和 JSON 语义。当前已实现请求及其输入、Spec、符号、偏好的
+组合校验，以及执行选项校验和部分容量策略；
+prepare 将输入问题转换为响应，但尚未接入解析和问题构建，不会返回 ready。
+计算、OCR、JSON codec 和进程后端仍未实现，其入口保留 NotImplementedError。
 
 模型按输入、运算、请求、诊断、准备、识别、结果和任务分组，具体文件、类型
 索引和依赖关系见[模型组织说明](schemas.md)。业务模块仍从 `mathlens.schemas`
@@ -51,6 +53,15 @@ preferences / schema_version`。`operation=null` 表示请求推断；显式运�
   LaTeX 计算不应再次读取原图。显式重新识别则需要重新注册有效资源。
 
 `operation` 是带 `kind` 标签的联合，不再使用通用 variables 字段：
+
+每种 Spec 提供 `validate() -> tuple[ValidationIssue, ...]`，负责自身参数与嵌套
+参数的类型、缺失和一致性检查。构造函数仅保存数据，不抛用户输入异常。
+ValidationIssue 位于独立的 schemas/validation.py，不依赖运算或应用响应，
+其字段路径相对 Spec。prepare 只调用统一方法，再附加 `/operation` 前缀。
+存在 INVALID 问题时返回 error；只有 MISSING/CONFLICT 时返回 needs_input；
+两者同时存在时，返回 error 并保留可操作的补充项。Spec 不解析数学文本，
+输入、符号假设和偏好由所属模型校验，ComputeRequest 组合校验并检查模型间
+关系。原式语义和运行时容量、能力由准备流程检查，不重复实现 Spec 的规则。
 
 | kind | 模型 | 参数规则 |
 |---|---|---|
@@ -196,6 +207,8 @@ compute 对应 PreparedProblem，recognize 对应 RecognitionRequest，IPC 解�
 对应其 envelope。空字符串指向文档根。即使诊断嵌入 steps 或 attempts，路径
 仍使用该入口输入作为参照，不切换为响应内部位置。InputRequest.field_path
 另按确认流程约定，始终指向调用方要修改并重新提交的 ComputeRequest。
+prepare 的执行配置错误使用 stage=execution，路径相对 ExecutionOptions，
+例如 `/timeout_seconds`；容量策略拒绝具体数学参数时仍相对 ComputeRequest。
 
 | code | 状态/来源 |
 |---|---|
@@ -231,7 +244,7 @@ media 的 ValueError/OSError、jobs 的 KeyError 也由入口映射。编程错�
 回收返回 error + cleanup_failed，不假称取消成功。回调异常由监督端隔离记录，
 不当作数学失败；控制回调不得阻塞监督循环。
 
-`ExecutionControl` 是运行时对象，含 CancellationToken 和进度回调，不能 JSON
+`ExecutionControl` 定义于 control.py，是运行时对象，含 CancellationToken 和进度回调，不能 JSON
 序列化或传入 worker 启动参数。进度 fraction 为 [0, 1] 或 null，不保证可估算。
 当前最终结果管道只发送一次结果；进度需要独立传输机制，由后端实现时选择。
 

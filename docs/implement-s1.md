@@ -2,7 +2,7 @@
 
 先实现 `prepare` 所需的问题准备，以及 LaTeX 解析、符号计算和结果转换。
 输入直接使用已有 Python 模型，JSON codec 不作为核心开发的前置任务。
-本文是待执行计划，当前接口仍未实现；模型与状态语义遵循
+当前已实现请求与嵌套模型的组合校验、执行选项校验及部分容量检查，解析和计算仍未实现；模型与状态语义遵循
 [接口契约](interfaces.md)，类型位置见[模型组织说明](schemas.md)。
 
 ## 1. 目标与顺序
@@ -35,7 +35,8 @@ ComputeRequest
 
 | 位置 | 本阶段工作 | 输出边界 |
 |---|---|---|
-| application.py | 请求检查、准备、编排和响应组装 | 只暴露公开模型 |
+| application.py | 委托模型校验、容量策略、准备编排和响应组装 | 只暴露公开模型 |
+| schemas/operations.py | 各运算及嵌套参数的 validate() | 返回 ValidationIssue，不构造响应、不抛输入异常 |
 | parsing/normalize.py | 移除配对公式定界符、清理外部空白、记录修改 | 清理后文本与修改记录 |
 | parsing/latex.py | 调用解析库，适配数学结构，提取符号和原式约束 | 仅内部使用的解析结果 |
 | solving/symbolic.py | 按显式运算调用符号算法，判断是否完成 | 内部数学结果及分类依据 |
@@ -59,6 +60,11 @@ prepare(request, *, options=None, control=None) -> PreparationResponse
 ### 基础检查
 
 直接构造的 dataclass 也需要检查，不能因暂未实现 JSON 输入就省略校验：
+
+Spec 自身规则由 validate() 执行，构造时允许不完整或无效参数。prepare
+委托 ComputeRequest 组合各模型的 validate() 并转换问题，不按具体运算编写
+重复的参数校验分支。执行选项先自校验，再作为独立容量策略的输入。类型/取值无效
+映射为 error，缺失或冲突映射为 needs_input；混合问题返回 error 并保留补充项。
 
 - schema_version 为已知整数版本，bool 不视为整数。
 - 输入模型、运算模型、嵌套字段和集合类型正确，字符串和容量满足限制。
