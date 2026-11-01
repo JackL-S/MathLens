@@ -92,13 +92,13 @@ def test_prepare_reports_numeric_parameter_conflict_as_needs_input():
     assert response.input_requests[0].field_path == "/operation/numeric/initial_values/0/variable"
 
 
-def test_prepare_does_not_claim_ready_before_parsing_is_available():
+def test_prepare_parses_simplification_problem():
     response = prepare(ComputeRequest(
         input=LatexInput(latex="x+x"), operation=SimplifySpec(),
     ))
-    assert response.status is PreparationStatus.UNSUPPORTED
-    assert response.diagnostics[0].code is DiagnosticCode.CAPABILITY_UNAVAILABLE
-    assert response.problem is None
+    assert response.status is PreparationStatus.READY
+    assert response.problem.latex == "x+x"
+    assert response.preview is not None
 
 
 @pytest.mark.parametrize("compute_request,code,path", [
