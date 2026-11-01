@@ -1,6 +1,6 @@
-"""执行预算、能力声明、worker 协议与后台任务快照。"""
+"""执行配置、能力声明与任务数据；与实际进程执行分开。"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Literal, TypeAlias
 
 from ..enums import Domain, JobState, MethodPolicy, Operation, ProcessingStage
@@ -9,6 +9,10 @@ from .diagnostics import Diagnostic
 from .recognition import RecognitionRequest, RecognitionResponse
 from .requests import ComputeRequest, PreparedProblem
 from .results import ApplicationResponse
+from .validation import (
+    ValidationIssue, boolean_issues, model_issues, positive_int_issues,
+    positive_number_issues, version_issues,
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -21,6 +25,13 @@ class ResourceLimits:
     max_derivative_order: int = 100
     max_steps: int = 1_000
 
+    def validate(self) -> tuple[ValidationIssue, ...]:
+        return tuple(
+            issue for item in fields(self)
+            for issue in positive_int_issues(getattr(self, item.name), f"/{item.name}", "容量限制")
+        )
+
+
 
 @dataclass(frozen=True, kw_only=True)
 class ExecutionOptions:
@@ -32,12 +43,23 @@ class ExecutionOptions:
     limits: ResourceLimits = field(default_factory=ResourceLimits)
     schema_version: int = SCHEMA_VERSION
 
+    def validate(self) -> tuple[ValidationIssue, ...]:
+        return (
+            version_issues(self.schema_version, SCHEMA_VERSION)
+            + positive_number_issues(self.timeout_seconds, "/timeout_seconds")
+            + positive_number_issues(self.cleanup_timeout_seconds, "/cleanup_timeout_seconds")
+            + boolean_issues(self.allow_partial_result, "/allow_partial_result", "部分结果选项")
+            + model_issues(self.limits, ResourceLimits, "/limits", lambda value: value.validate())
+        )
+
+
 
 @dataclass(frozen=True, kw_only=True)
 class ProgressEvent:
     stage: ProcessingStage
     message: str
     fraction: float | None = None
+
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -47,6 +69,7 @@ class OperationCapability:
     supports_steps: bool = False
     solution_domains: tuple[Domain, ...] = ()
     max_variables: int | None = None
+
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -59,6 +82,7 @@ class Capabilities:
     supports_cancellation: bool = False
     limits: ResourceLimits = field(default_factory=ResourceLimits)
     schema_version: int = SCHEMA_VERSION
+
 
 
 @dataclass(frozen=True, kw_only=True)

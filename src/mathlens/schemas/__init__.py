@@ -1,7 +1,7 @@
 """全项目数据契约的统一导入入口，按类型分组定义于各子模块。
 
-模型不包含校验、数学计算或 JSON codec 实现。dataclass 类型注解不执行
-运行时校验；跨边界数据由 codec 处理，跨字段约束见 docs/interfaces.md。
+Spec 提供显式参数校验，不在构造时抛输入异常。dataclass 类型注解不自动
+校验；JSON 边界由 codec 处理，跨字段约束见 docs/interfaces.md。
 子模块直接引用模型所属模块，不反向导入本入口，以保持依赖单向。
 """
 
@@ -11,6 +11,7 @@ from .base import (
     JSONValue,
     MathExpression,
 )
+from .validation import ValidationIssue
 from .inputs import (
     ImageRegion,
     MediaResource,
@@ -92,6 +93,7 @@ from .tasks import (
 )
 
 __all__ = (
+    "ValidationIssue",
     "SCHEMA_VERSION",
     "PROTOCOL_VERSION",
     "JSONValue",

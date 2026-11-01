@@ -102,6 +102,14 @@ class OutputFormat(StrEnum):
     JSON = "json"
 
 
+class ValidationIssueKind(StrEnum):
+    """输入校验问题的性质，不等同于整个准备流程的状态。"""
+
+    INVALID = "invalid"
+    MISSING = "missing"
+    CONFLICT = "conflict"
+
+
 @unique
 class DiagnosticCode(StrEnum):
     """全流程稳定原因码，与处理状态和消息级别分别表达。
