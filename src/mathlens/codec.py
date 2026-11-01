@@ -7,15 +7,13 @@
 from typing import TypeAlias
 
 from .schemas import (
-    ApplicationResponse, CancelResponse, Capabilities, ComputeRequest,
-    ExecutionOptions, JobHandle, JobSnapshot, MediaResource, PreparedProblem,
-    RecognitionRequest, RecognitionResponse, WorkerRequest, WorkerResult,
+    ApplicationResponse, Capabilities, ComputeRequest, ExecutionOptions,
+    PreparedProblem, WorkerRequest, WorkerResult,
 )
 
 PublicDocument: TypeAlias = (
     ComputeRequest | PreparedProblem | ApplicationResponse
-    | RecognitionRequest | RecognitionResponse | MediaResource
-    | ExecutionOptions | JobHandle | JobSnapshot | CancelResponse | Capabilities
+    | ExecutionOptions | Capabilities
 )
 
 
@@ -44,7 +42,7 @@ def decode_prepared_problem(payload: bytes) -> PreparedProblem:
     raise NotImplementedError
 
 
-def decode_response(payload: bytes) -> ApplicationResponse | RecognitionResponse:
+def decode_response(payload: bytes) -> ApplicationResponse:
     """严格解码响应，通过 kind 区分模型；失败抛 ContractDecodeError。"""
     raise NotImplementedError
 

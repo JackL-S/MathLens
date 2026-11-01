@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from typing import Literal, TypeAlias
 
 from ..enums import DiagnosticCode
-from .base import SCHEMA_VERSION
 from .validation import (
     ValidationIssue, invalid, model_issues, positive_int_issues, text_issues,
 )
@@ -26,17 +25,6 @@ class ImageRegion:
             + positive_int_issues(self.width, "/width", "区域宽度")
             + positive_int_issues(self.height, "/height", "区域高度")
         )
-
-
-@dataclass(frozen=True, kw_only=True)
-class MediaResource:
-    """输入资源层管理的标识，不能作为任意文件路径或 URL。"""
-
-    media_id: str
-    media_type: str
-    width: int
-    height: int
-    schema_version: int = SCHEMA_VERSION
 
 
 @dataclass(frozen=True, kw_only=True)

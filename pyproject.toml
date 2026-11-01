@@ -19,8 +19,6 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest==8.4.2"]
 
-# Add the CLI entry point when mathlens.cli.main is implemented.
-
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["mathlens", "mathlens.*"]

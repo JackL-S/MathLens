@@ -1,4 +1,4 @@
-"""全项目数据契约的统一导入入口，按类型分组定义于各子模块。
+"""数学请求、结果与执行数据的统一导入入口，按类型分组定义于各子模块。
 
 Spec 提供显式参数校验，不在构造时抛输入异常。dataclass 类型注解不自动
 校验；JSON 边界由 codec 处理，跨字段约束见 docs/interfaces.md。
@@ -8,13 +8,11 @@ Spec 提供显式参数校验，不在构造时抛输入异常。dataclass 类�
 from .base import (
     SCHEMA_VERSION,
     PROTOCOL_VERSION,
-    JSONValue,
     MathExpression,
 )
 from .validation import ValidationIssue
 from .inputs import (
     ImageRegion,
-    MediaResource,
     ImageInput,
     LatexInput,
     InputSpec,
@@ -49,12 +47,6 @@ from .diagnostics import (
 from .preparation import (
     PreparationResponse,
 )
-from .recognition import (
-    RecognitionCandidate,
-    RecognizedRegion,
-    RecognitionRequest,
-    RecognitionResponse,
-)
 from .results import (
     ExpressionValue,
     FiniteSetValue,
@@ -82,24 +74,17 @@ from .tasks import (
     PrepareTask,
     ComputeTask,
     RunTask,
-    RecognizeTask,
     WorkerTask,
-    WorkerResponse,
     WorkerRequest,
     WorkerResult,
-    JobHandle,
-    JobSnapshot,
-    CancelResponse,
 )
 
 __all__ = (
     "ValidationIssue",
     "SCHEMA_VERSION",
     "PROTOCOL_VERSION",
-    "JSONValue",
     "MathExpression",
     "ImageRegion",
-    "MediaResource",
     "ImageInput",
     "LatexInput",
     "InputSpec",
@@ -125,10 +110,6 @@ __all__ = (
     "InputChoice",
     "InputRequest",
     "PreparationResponse",
-    "RecognitionCandidate",
-    "RecognizedRegion",
-    "RecognitionRequest",
-    "RecognitionResponse",
     "ExpressionValue",
     "FiniteSetValue",
     "SymbolicSetValue",
@@ -153,12 +134,7 @@ __all__ = (
     "PrepareTask",
     "ComputeTask",
     "RunTask",
-    "RecognizeTask",
     "WorkerTask",
-    "WorkerResponse",
     "WorkerRequest",
     "WorkerResult",
-    "JobHandle",
-    "JobSnapshot",
-    "CancelResponse",
 )

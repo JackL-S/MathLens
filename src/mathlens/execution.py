@@ -3,7 +3,7 @@
 from multiprocessing.connection import Connection
 
 from .control import CancellationToken, ExecutionControl
-from .schemas import ExecutionOptions, WorkerResponse, WorkerTask
+from .schemas import ExecutionOptions, ApplicationResponse, WorkerTask
 
 
 def execute(
@@ -11,8 +11,8 @@ def execute(
     *,
     options: ExecutionOptions | None = None,
     control: ExecutionControl | None = None,
-) -> WorkerResponse:
-    """在隔离 worker 中执行任务，覆盖识别、准备和计算等耗时阶段。
+) -> ApplicationResponse:
+    """在隔离 worker 中执行任务，覆盖准备和计算等耗时阶段。
 
     按总时限监督启动到结果接收；清理最多另用 cleanup_timeout_seconds。
     采用 JSON bytes 通信，限时限长接收；返回前确认回收，否则报 error。

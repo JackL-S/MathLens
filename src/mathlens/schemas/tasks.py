@@ -3,10 +3,8 @@
 from dataclasses import dataclass, field, fields
 from typing import Literal, TypeAlias
 
-from ..enums import Domain, JobState, MethodPolicy, Operation, ProcessingStage
+from ..enums import Domain, MethodPolicy, Operation, ProcessingStage
 from .base import PROTOCOL_VERSION, SCHEMA_VERSION
-from .diagnostics import Diagnostic
-from .recognition import RecognitionRequest, RecognitionResponse
 from .requests import ComputeRequest, PreparedProblem
 from .results import ApplicationResponse
 from .validation import (
@@ -103,16 +101,7 @@ class RunTask:
     kind: Literal["run"] = field(default="run", init=False)
 
 
-@dataclass(frozen=True, kw_only=True)
-class RecognizeTask:
-    request: RecognitionRequest
-    kind: Literal["recognize"] = field(default="recognize", init=False)
-
-
-WorkerTask: TypeAlias = PrepareTask | ComputeTask | RunTask | RecognizeTask
-
-
-WorkerResponse: TypeAlias = ApplicationResponse | RecognitionResponse
+WorkerTask: TypeAlias = PrepareTask | ComputeTask | RunTask
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -124,29 +113,5 @@ class WorkerRequest:
 
 @dataclass(frozen=True, kw_only=True)
 class WorkerResult:
-    response: WorkerResponse
+    response: ApplicationResponse
     protocol_version: int = PROTOCOL_VERSION
-
-
-@dataclass(frozen=True, kw_only=True)
-class JobHandle:
-    job_id: str
-    schema_version: int = SCHEMA_VERSION
-
-
-@dataclass(frozen=True, kw_only=True)
-class JobSnapshot:
-    job_id: str
-    state: JobState
-    progress: ProgressEvent | None = None
-    response: "WorkerResponse | None" = None
-    diagnostics: tuple[Diagnostic, ...] = ()
-    schema_version: int = SCHEMA_VERSION
-
-
-@dataclass(frozen=True, kw_only=True)
-class CancelResponse:
-    job_id: str
-    accepted: bool
-    state: JobState
-    schema_version: int = SCHEMA_VERSION

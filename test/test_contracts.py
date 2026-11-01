@@ -1,4 +1,4 @@
-"""仅验证契约表达力和文档示例，不代表 codec 或数学后端已实现。"""
+"""验证模型结构与长期数学契约示例；运行行为由各模块测试覆盖。"""
 
 import importlib
 import inspect
@@ -26,7 +26,7 @@ EXAMPLES = Path(__file__).resolve().parents[1] / "docs" / "examples"
 
 
 def representation(model):
-    """只检查 JSON 表示，不代替将来 codec 的类型恢复和输入校验。"""
+    """只检查 JSON 表示，不代替 codec 的类型恢复和输入校验。"""
     return json.loads(json.dumps(asdict(model), ensure_ascii=False, allow_nan=False))
 
 
@@ -130,7 +130,7 @@ def test_prepared_snapshot_cannot_be_rewritten_in_place():
 
 @pytest.mark.parametrize("union", [
     schemas.InputSpec, schemas.OperationSpec, schemas.MathValue,
-    schemas.WorkerTask, schemas.WorkerResponse,
+    schemas.WorkerTask, schemas.ApplicationResponse,
 ])
 def test_tagged_unions_have_unambiguous_tags(union):
     tags = [model.__dataclass_fields__["kind"].default for model in get_args(union)]
@@ -180,8 +180,7 @@ def test_schema_models_have_a_canonical_public_export():
 
 
 @pytest.mark.parametrize("module_name", [
-    "application", "execution", "codec", "jobs", "media", "ocr",
-    "rendering.formats", "cli",
+    "application", "execution", "codec",
 ])
 def test_public_interface_annotations_resolve(module_name):
     module = importlib.import_module("mathlens." + module_name)

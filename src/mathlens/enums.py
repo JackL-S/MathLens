@@ -88,20 +88,6 @@ class StepsStatus(StrEnum):
     UNAVAILABLE = "unavailable"
 
 
-class JobState(StrEnum):
-    QUEUED = "queued"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class OutputFormat(StrEnum):
-    TEXT = "text"
-    LATEX = "latex"
-    JSON = "json"
-
-
 class ValidationIssueKind(StrEnum):
     """输入校验问题的性质，不等同于整个准备流程的状态。"""
 
